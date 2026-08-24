@@ -12,6 +12,7 @@ export function Hero() {
         sizes="100vw"
         className="object-cover opacity-70"
       />
+      <div className="absolute inset-0 z-[5] bg-gradient-to-t from-charcoal/70 via-charcoal/20 to-transparent" />
       <div className="relative z-10 container-brand pb-16 pt-32 md:pb-24">
         <p className="mb-4 text-xs uppercase tracking-[0.2em] text-sand">Designed in-house. Built to last.</p>
         <h1 className="font-display max-w-xl text-4xl leading-[1.05] md:text-6xl">

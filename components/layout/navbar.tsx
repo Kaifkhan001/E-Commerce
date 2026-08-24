@@ -24,7 +24,8 @@ export function Navbar() {
   return (
     <header
       className={cn(
-        "sticky top-0 z-40 border-b border-transparent bg-ivory/95 backdrop-blur transition-shadow",
+        "sticky top-0 z-40 border-b border-transparent bg-ivory/95 transition-shadow",
+        !mobileOpen && "backdrop-blur",
         scrolled && "border-border shadow-sm"
       )}
     >
