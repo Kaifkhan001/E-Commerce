@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { motion, useReducedMotion } from "framer-motion";
 import { cn } from "@/lib/utils/cn";
 
 type BaseProps = {
@@ -23,23 +26,51 @@ const sizeClasses: Record<NonNullable<BaseProps["size"]>, string> = {
 const base =
   "inline-flex items-center justify-center gap-2 font-medium tracking-wide transition-colors duration-200 disabled:opacity-50 disabled:pointer-events-none";
 
-type ButtonProps = BaseProps &
-  React.ButtonHTMLAttributes<HTMLButtonElement> & { href?: undefined };
+// framer-motion redefines these drag/animation event handlers with its own signatures,
+// so the native DOM attribute types must be omitted to avoid a signature clash.
+type MotionConflictingProps =
+  | "onDrag"
+  | "onDragStart"
+  | "onDragEnd"
+  | "onAnimationStart"
+  | "onAnimationEnd"
+  | "onAnimationIteration";
 
-type LinkButtonProps = BaseProps & { href: string } & Omit<React.ComponentProps<typeof Link>, "href" | "className">;
+type ButtonProps = BaseProps &
+  Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, MotionConflictingProps> & { href?: undefined };
+
+type LinkButtonProps = BaseProps & { href: string } & Omit<
+    React.ComponentProps<typeof Link>,
+    "href" | "className" | MotionConflictingProps
+  >;
+
+const MotionLink = motion.create(Link);
 
 export function Button({ variant = "primary", size = "md", className, children, ...props }: ButtonProps) {
+  const prefersReducedMotion = useReducedMotion();
   return (
-    <button className={cn(base, variantClasses[variant], sizeClasses[size], className)} {...props}>
+    <motion.button
+      whileTap={prefersReducedMotion ? undefined : { scale: 0.97 }}
+      transition={{ duration: 0.15 }}
+      className={cn(base, variantClasses[variant], sizeClasses[size], className)}
+      {...props}
+    >
       {children}
-    </button>
+    </motion.button>
   );
 }
 
 export function LinkButton({ variant = "primary", size = "md", className, children, href, ...props }: LinkButtonProps) {
+  const prefersReducedMotion = useReducedMotion();
   return (
-    <Link href={href} className={cn(base, variantClasses[variant], sizeClasses[size], className)} {...props}>
+    <MotionLink
+      href={href}
+      whileTap={prefersReducedMotion ? undefined : { scale: 0.97 }}
+      transition={{ duration: 0.15 }}
+      className={cn(base, variantClasses[variant], sizeClasses[size], className)}
+      {...props}
+    >
       {children}
-    </Link>
+    </MotionLink>
   );
 }

@@ -10,12 +10,12 @@ export function ProductGallery({ images, title }: { images: ProductImage[]; titl
   const current = images[active] ?? images[0];
 
   if (!current) {
-    return <div className="aspect-square bg-ivory-deep" />;
+    return <div className="aspect-square rounded-[15px] bg-ivory-deep" />;
   }
 
   return (
     <div>
-      <div className="relative aspect-square overflow-hidden bg-ivory-deep md:aspect-[4/5]">
+      <div className="relative aspect-square overflow-hidden rounded-[15px] bg-ivory-deep md:aspect-[4/5]">
         <Image
           src={current.url}
           alt={current.altText || title}
@@ -34,7 +34,7 @@ export function ProductGallery({ images, title }: { images: ProductImage[]; titl
               aria-label={`View image ${i + 1} of ${images.length}`}
               aria-current={i === active}
               className={cn(
-                "relative aspect-square overflow-hidden border bg-ivory-deep",
+                "relative aspect-square overflow-hidden rounded-[15px] border bg-ivory-deep",
                 i === active ? "border-charcoal" : "border-border"
               )}
             >

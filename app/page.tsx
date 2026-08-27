@@ -8,6 +8,7 @@ import { Craftsmanship } from "@/components/home/craftsmanship";
 import { WhyChooseUs } from "@/components/home/why-choose-us";
 import { FaqPreview } from "@/components/home/faq-preview";
 import { FinalCta } from "@/components/home/final-cta";
+import { Reveal } from "@/components/ui/reveal";
 
 export default async function HomePage() {
   const [bestSellers, newArrivals, allProducts] = await Promise.all([
@@ -19,25 +20,45 @@ export default async function HomePage() {
   return (
     <>
       <Hero />
-      <Marquee />
-      <ProductGridSection
-        title="Featured Bags"
-        subtitle="A starting point — the bags people ask about most."
-        products={allProducts}
-        viewAllHref="/shop"
-      />
-      <ShopByPurpose />
+      <Reveal>
+        <Marquee />
+      </Reveal>
+      <Reveal>
+        <ProductGridSection
+          title="Featured Bags"
+          subtitle="A starting point — the bags people ask about most."
+          products={allProducts}
+          viewAllHref="/shop"
+        />
+      </Reveal>
+      <Reveal>
+        <ShopByPurpose />
+      </Reveal>
       {bestSellers && bestSellers.products.length > 0 ? (
-        <ProductGridSection title="Best Sellers" products={bestSellers.products} viewAllHref="/collections/best-sellers" />
+        <Reveal>
+          <ProductGridSection title="Best Sellers" products={bestSellers.products} viewAllHref="/collections/best-sellers" />
+        </Reveal>
       ) : null}
-      <Craftsmanship />
-      <ShopByCapacity />
+      <Reveal>
+        <Craftsmanship />
+      </Reveal>
+      <Reveal>
+        <ShopByCapacity />
+      </Reveal>
       {newArrivals && newArrivals.products.length > 0 ? (
-        <ProductGridSection title="New Arrivals" products={newArrivals.products} viewAllHref="/collections/new-arrivals" />
+        <Reveal>
+          <ProductGridSection title="New Arrivals" products={newArrivals.products} viewAllHref="/collections/new-arrivals" />
+        </Reveal>
       ) : null}
-      <WhyChooseUs />
-      <FaqPreview />
-      <FinalCta />
+      <Reveal>
+        <WhyChooseUs />
+      </Reveal>
+      <Reveal>
+        <FaqPreview />
+      </Reveal>
+      <Reveal>
+        <FinalCta />
+      </Reveal>
     </>
   );
 }

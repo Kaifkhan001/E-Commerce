@@ -12,14 +12,22 @@ function normalizeImage(img: ProductImage | null | undefined): ProductImage | nu
 
 export async function getCollections(): Promise<Pick<Collection, "id" | "handle" | "title" | "description" | "image">[]> {
   if (!shopifyConfig.enabled) {
-    return mockDb.collections.map(({ id, handle, title, description, image }) => ({ id, handle, title, description, image }));
+    // "frontpage" is Shopify's auto-generated system collection for default-theme homepages,
+    // not customer-facing content in a headless storefront.
+    return mockDb.collections
+      .filter((c) => c.handle !== "frontpage")
+      .map(({ id, handle, title, description, image }) => ({ id, handle, title, description, image }));
   }
 
   const data = await shopifyFetch<{
     collections: { nodes: { id: string; handle: string; title: string; description: string; image: ProductImage | null }[] };
   }>({ query: COLLECTIONS_QUERY, variables: { first: 20 }, tags: ["collections"] });
 
-  return data.collections.nodes.map((c) => ({ ...c, image: normalizeImage(c.image) }));
+  // "frontpage" is Shopify's auto-generated system collection for default-theme homepages,
+  // not customer-facing content in a headless storefront.
+  return data.collections.nodes
+    .filter((c) => c.handle !== "frontpage")
+    .map((c) => ({ ...c, image: normalizeImage(c.image) }));
 }
 
 export async function getCollectionByHandle(handle: string, opts: { first?: number } = {}): Promise<Collection | null> {

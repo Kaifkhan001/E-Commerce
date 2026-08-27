@@ -32,7 +32,7 @@ export function CartPageView({ initialCart }: { initialCart: Cart | null }) {
         <ul className="divide-y divide-border border-y border-border">
           {cart.lines.map((line) => (
             <li key={line.id} className="flex gap-5 py-6">
-              <div className="relative h-28 w-24 shrink-0 overflow-hidden bg-ivory-deep">
+              <div className="relative h-28 w-24 shrink-0 overflow-hidden rounded-[15px] bg-ivory-deep">
                 {line.merchandise.product.featuredImage ? (
                   <Image
                     src={line.merchandise.product.featuredImage.url}

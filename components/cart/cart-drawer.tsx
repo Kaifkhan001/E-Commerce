@@ -57,7 +57,7 @@ export function CartDrawer() {
             <ul className="flex-1 overflow-y-auto px-5 py-4">
               {cart.lines.map((line) => (
                 <li key={line.id} className="flex gap-4 border-b border-border py-4 first:pt-0 last:border-none">
-                  <div className="relative h-24 w-20 shrink-0 overflow-hidden bg-ivory-deep">
+                  <div className="relative h-24 w-20 shrink-0 overflow-hidden rounded-[15px] bg-ivory-deep">
                     {line.merchandise.product.featuredImage ? (
                       <Image
                         src={line.merchandise.product.featuredImage.url}

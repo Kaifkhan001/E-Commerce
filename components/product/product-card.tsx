@@ -20,7 +20,7 @@ export function ProductCard({ product }: { product: ProductCardData }) {
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
-      <div className="relative aspect-[4/5] overflow-hidden bg-ivory-deep">
+      <div className="relative aspect-[4/5] overflow-hidden rounded-[15px] bg-ivory-deep">
         {image ? (
           <Image
             src={image.url}
