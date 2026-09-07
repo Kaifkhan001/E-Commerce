@@ -3,11 +3,11 @@
 // checklist before launch".
 
 export const siteConfig = {
-  name: "Aramis Bags",
+  name: "Tripsbag",
   url: process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000",
-  tagline: "Bags built to be carried, not just bought.",
+  tagline: "Carry What Matters",
   description:
-    "Aramis Bags designs and manufactures backpacks, totes, and travel bags for people who move through their day carrying real things.",
+    "Tripsbag designs and manufactures backpacks, totes, and travel bags for people who move through their day carrying real things.",
   // Demo contact/business details — placeholders, not real registered info.
   contactEmail: "hello@example.com",
   supportPhone: "+91 00000 00000",

@@ -58,7 +58,7 @@ const products: Product[] = [
     ],
     availableForSale: true,
     tags: ["travel", "bestseller"],
-    vendor: "Aramis Bags",
+    vendor: "Tripsbag",
     productType: "Backpack",
     specs: {
       capacityLiters: 32,
@@ -101,7 +101,7 @@ const products: Product[] = [
     ],
     availableForSale: true,
     tags: ["work", "new"],
-    vendor: "Aramis Bags",
+    vendor: "Tripsbag",
     productType: "Tote",
     specs: {
       capacityLiters: 18,
@@ -163,7 +163,7 @@ const products: Product[] = [
     ],
     availableForSale: true,
     tags: ["college", "bestseller", "sale"],
-    vendor: "Aramis Bags",
+    vendor: "Tripsbag",
     productType: "Backpack",
     specs: {
       capacityLiters: 22,
@@ -201,7 +201,7 @@ const products: Product[] = [
     ],
     availableForSale: true,
     tags: ["gym", "new"],
-    vendor: "Aramis Bags",
+    vendor: "Tripsbag",
     productType: "Duffel",
     specs: {
       capacityLiters: 28,
@@ -239,7 +239,7 @@ const products: Product[] = [
     ],
     availableForSale: true,
     tags: ["camera"],
-    vendor: "Aramis Bags",
+    vendor: "Tripsbag",
     productType: "Sling",
     specs: {
       capacityLiters: 8,
@@ -276,7 +276,7 @@ const products: Product[] = [
     ],
     availableForSale: true,
     tags: ["everyday", "sale"],
-    vendor: "Aramis Bags",
+    vendor: "Tripsbag",
     productType: "Crossbody",
     specs: {
       capacityLiters: 3,

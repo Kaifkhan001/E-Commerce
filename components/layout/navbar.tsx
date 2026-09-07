@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Menu, Search, User, Heart, ShoppingBag, X } from "lucide-react";
@@ -51,8 +52,15 @@ export function Navbar() {
           <Menu size={22} />
         </button>
 
-        <Link href="/" className="font-display text-xl tracking-tight md:text-2xl">
-          {siteConfig.name}
+        <Link href="/" aria-label={siteConfig.name} className="shrink-0">
+          <Image
+            src="/logo-wordmark.png"
+            alt={siteConfig.name}
+            width={861}
+            height={249}
+            priority
+            className="h-8 w-auto md:h-9"
+          />
         </Link>
 
         <nav className="hidden items-center gap-8 md:flex">
@@ -103,7 +111,7 @@ export function Navbar() {
               transition={{ duration: prefersReducedMotion ? 0 : 0.3, ease: "easeOut" }}
             >
               <div className="mb-8 flex items-center justify-between">
-                <span className="font-display text-lg">{siteConfig.name}</span>
+                <Image src="/logo-wordmark.png" alt={siteConfig.name} width={861} height={249} className="h-7 w-auto" />
                 <button aria-label="Close menu" onClick={() => setMobileOpen(false)} className="p-1">
                   <X size={22} />
                 </button>

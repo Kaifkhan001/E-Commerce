@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { footerNav, siteConfig } from "@/config/site";
 import { NewsletterForm } from "@/components/home/newsletter-form";
 
@@ -25,7 +26,7 @@ export function Footer() {
       <div className="container-brand py-14">
         <div className="mb-12 grid gap-8 md:grid-cols-2">
           <div>
-            <span className="font-display text-xl">{siteConfig.name}</span>
+            <Image src="/logo-full.png" alt={`${siteConfig.name} — ${siteConfig.tagline}`} width={871} height={345} className="h-14 w-auto" />
             <p className="mt-3 max-w-sm text-sm text-charcoal-soft">{siteConfig.description}</p>
           </div>
           <div className="md:justify-self-end md:max-w-sm">

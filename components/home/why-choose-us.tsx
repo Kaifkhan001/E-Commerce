@@ -9,7 +9,7 @@ export function WhyChooseUs() {
   return (
     <section className="border-y border-border bg-ivory-deep py-16 md:py-24">
       <div className="container-brand">
-        <h2 className="font-display mb-10 text-2xl md:text-3xl">Why Aramis</h2>
+        <h2 className="font-display mb-10 text-2xl md:text-3xl">Why Tripsbag</h2>
         <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
           {points.map((p) => (
             <div key={p.title}>

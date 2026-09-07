@@ -8,17 +8,17 @@ import { cn } from "@/lib/utils/cn";
 type Slide = { src: string; alt: string };
 
 const DESKTOP_SLIDES: Slide[] = [
-  { src: "/banner-images/multi-banner__media-desktop-01.png", alt: "Aramis bags, lifestyle image 1" },
-  { src: "/banner-images/multi-banner__media-desktop-02.png", alt: "Aramis bags, lifestyle image 2" },
-  { src: "/banner-images/multi-banner__media-desktop-03.png", alt: "Aramis bags, lifestyle image 3" },
-  { src: "/banner-images/multi-banner__media-desktop-04.png", alt: "Aramis bags, lifestyle image 4" },
+  { src: "/banner-images/multi-banner__media-desktop-01.png", alt: "Tripsbag bags, lifestyle image 1" },
+  { src: "/banner-images/multi-banner__media-desktop-02.png", alt: "Tripsbag bags, lifestyle image 2" },
+  { src: "/banner-images/multi-banner__media-desktop-03.png", alt: "Tripsbag bags, lifestyle image 3" },
+  { src: "/banner-images/multi-banner__media-desktop-04.png", alt: "Tripsbag bags, lifestyle image 4" },
 ];
 
 const MOBILE_SLIDES: Slide[] = [
-  { src: "/banner-images/multi-banner__media-mobile-01.png", alt: "Aramis bags, lifestyle image 1" },
-  { src: "/banner-images/multi-banner__media-mobile-02.png", alt: "Aramis bags, lifestyle image 2" },
-  { src: "/banner-images/multi-banner__media-mobile-03.png", alt: "Aramis bags, lifestyle image 3" },
-  { src: "/banner-images/multi-banner__media-mobile-04.png", alt: "Aramis bags, lifestyle image 4" },
+  { src: "/banner-images/multi-banner__media-mobile-01.png", alt: "Tripsbag bags, lifestyle image 1" },
+  { src: "/banner-images/multi-banner__media-mobile-02.png", alt: "Tripsbag bags, lifestyle image 2" },
+  { src: "/banner-images/multi-banner__media-mobile-03.png", alt: "Tripsbag bags, lifestyle image 3" },
+  { src: "/banner-images/multi-banner__media-mobile-04.png", alt: "Tripsbag bags, lifestyle image 4" },
 ];
 
 const SLIDE_COUNT = DESKTOP_SLIDES.length;

@@ -1,8 +1,8 @@
-# Aramis Bags — Headless Shopify Storefront
+# Tripsbag — Headless Shopify Storefront
 
 A Next.js storefront for a bag manufacturing brand, backed by Shopify as the commerce engine via the Storefront API. Runs in a **mock data mode** out of the box (no Shopify account needed to develop against), and switches to **live Shopify mode** with three environment variables.
 
-> "Aramis Bags" is a placeholder brand name and all copy, imagery, and business details (address, phone, policies) in this repo are demo content. Search for "placeholder" throughout the codebase before launch — every instance is intentionally flagged.
+> "Tripsbag" is a placeholder brand name and all copy, imagery, and business details (address, phone, policies) in this repo are demo content. Search for "placeholder" throughout the codebase before launch — every instance is intentionally flagged.
 
 ## Architecture
 
