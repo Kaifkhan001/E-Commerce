@@ -47,7 +47,7 @@ export const footerNav = {
     { label: "Terms of Service", href: "/terms" },
   ],
   social: [
-    { label: "Instagram", href: "https://www.instagram.com/reel/DcHA-85zbpp/?stkn=bWIzYXpzdmh5OW5m" },
+    { label: "Instagram", href: "https://www.instagram.com/tripsbag?utm_source=qr&stkn=MXB0M3czOHphcHg4cQ==" },
     { label: "Facebook", href: "https://facebook.com" },
     { label: "Pinterest", href: "https://pinterest.com" },
   ],
