@@ -15,6 +15,13 @@
       "when": 1789315129302,
       "tag": "0001_glorious_enchantress",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1789317487183,
+      "tag": "0002_dark_venom",
+      "breakpoints": true
     }
   ]
 }

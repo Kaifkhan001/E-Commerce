@@ -112,10 +112,23 @@ export const walletTransactions = pgTable(
     type: walletTransactionTypeEnum("type").notNull(),
     // Shopify order GID/numeric id this row relates to. Nullable so a
     // future manual adjustment (support crediting/debiting outside an
-    // order context) has somewhere to live without a fake order id —
-    // Postgres treats each NULL as distinct, so nulls never collide with
-    // the unique constraint below.
+    // order context) has somewhere to live without a fake order id.
     shopifyOrderId: text("shopifyOrderId"),
+    // Uniquely identifies the SOURCE EVENT that produced this row — not the
+    // order, the event. For 'earned' this is the order id itself (an order
+    // is only ever paid once). For 'reversed' via cancellation it's
+    // `cancel:<orderId>` (an order is only ever cancelled once). For
+    // 'reversed' via refund it's the refund's own GID, since one order can
+    // have many refunds. This is what makes the unique constraint below
+    // work for BOTH idempotency (retry of the exact same event is rejected)
+    // AND multiple distinct reversal events per order (a second, different
+    // partial refund gets its own row instead of colliding with the
+    // first) — (shopifyOrderId, type) alone can't do both at once, because
+    // "one row per order" and "one row per event, of which an order can
+    // have several" are different constraints. Nullable for the same
+    // reason shopifyOrderId is (a future one-off manual adjustment), but
+    // every webhook-driven insert in lib/wallet/ledger.ts always sets it.
+    sourceEventId: text("sourceEventId"),
     // Set for 'earned' rows only — when that credit stops being spendable.
     expiresAt: timestamp("expiresAt", { mode: "date" }),
     createdAt: timestamp("createdAt", { mode: "date" }).notNull().defaultNow(),
@@ -125,10 +138,14 @@ export const walletTransactions = pgTable(
   },
   (table) => ({
     emailIdx: index("wallet_transactions_email_idx").on(table.email),
-    // Primary idempotency guard: a webhook retry or duplicate delivery for
-    // the same order can never insert a second row of the same type. See
-    // lib/wallet/ledger.ts for how this is used (and its current
-    // limitation for multiple partial refunds on one order).
-    orderTypeUnique: uniqueIndex("wallet_transactions_order_type_unique").on(table.shopifyOrderId, table.type),
+    // Primary idempotency guard: a webhook retry or duplicate delivery of
+    // the same source event can never insert a second row for it, while a
+    // genuinely different event (e.g. a second partial refund) for the
+    // same order is still allowed. See lib/wallet/ledger.ts.
+    orderTypeEventUnique: uniqueIndex("wallet_transactions_order_type_event_unique").on(
+      table.shopifyOrderId,
+      table.type,
+      table.sourceEventId
+    ),
   })
 );

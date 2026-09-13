@@ -16,11 +16,12 @@ function isUniqueViolation(error: unknown): boolean {
 export type InsertEarnedResult = { inserted: true; id: string } | { inserted: false; reason: "duplicate" };
 
 /**
- * Records cashback earned on a paid order. Idempotent: if a row for this
- * order already exists (a webhook retry or duplicate delivery), the unique
- * constraint on (shopifyOrderId, type) rejects the insert and this returns
- * `{ inserted: false, reason: "duplicate" }` instead of throwing — the
- * caller should treat that as success (200), not an error.
+ * Records cashback earned on a paid order. Idempotent: an order can only be
+ * paid once, so `sourceEventId` is just the order id itself — a webhook
+ * retry or duplicate delivery for the same order collides with the unique
+ * constraint and this returns `{ inserted: false, reason: "duplicate" }`
+ * instead of throwing. The caller should treat that as success (200), not
+ * an error.
  */
 export async function insertEarnedTransaction(params: {
   email: string;
@@ -37,6 +38,7 @@ export async function insertEarnedTransaction(params: {
         amountPaise: params.amountPaise,
         type: "earned",
         shopifyOrderId: params.shopifyOrderId,
+        sourceEventId: params.shopifyOrderId,
         expiresAt: params.expiresAt,
         note: params.note,
       })
@@ -89,7 +91,7 @@ export async function getReversedTotalForOrder(shopifyOrderId: string): Promise<
 export type InsertReversalResult =
   | { inserted: true; id: string; amountPaise: number }
   | { inserted: false; reason: "nothing-to-reverse" }
-  | { inserted: false; reason: "conflict" };
+  | { inserted: false; reason: "duplicate" };
 
 /**
  * Reverses up to `requestedAmountPaise` (a positive number) of previously
@@ -98,21 +100,20 @@ export type InsertReversalResult =
  * the remaining reversible amount is (total earned − total already
  * reversed), queried fresh before every insert.
  *
- * KNOWN LIMITATION — read before calling this a second time for one order:
- * the unique constraint on (shopifyOrderId, type) allows at most ONE
- * 'reversed' row per order, ever. That's correct and sufficient for a full
- * cancellation, or a single partial refund. A SECOND reversal event for the
- * same order (a second partial refund, or a refund arriving after a
- * cancellation already recorded one) cannot be safely written under the
- * current schema. Rather than guess whether such a case is a harmless
- * duplicate delivery of an event we already processed or a genuinely new
- * event we're about to under-process, this function returns
- * `{ reason: "conflict" }` and writes nothing — the caller must surface
- * this loudly (see the webhook route), not swallow it as a success.
+ * `sourceEventId` must uniquely identify the EVENT causing this reversal
+ * (not the order) — the refund's own GID for a partial refund, or
+ * `cancel:<orderId>` for a cancellation (see `reverseFullOrderCredit`).
+ * This is what lets a second, genuinely different reversal event for the
+ * same order succeed instead of colliding with the first one, while a
+ * retried delivery of the exact same event (same sourceEventId) still
+ * collides with the unique constraint and comes back here as
+ * `{ reason: "duplicate" }` — treat that as success (200), not an error,
+ * exactly like a duplicate 'earned' insert.
  */
 export async function insertReversalForOrder(params: {
   email: string;
   shopifyOrderId: string;
+  sourceEventId: string;
   requestedAmountPaise: number;
   note: string;
 }): Promise<InsertReversalResult> {
@@ -133,19 +134,30 @@ export async function insertReversalForOrder(params: {
         amountPaise: -amountToReverse,
         type: "reversed",
         shopifyOrderId: params.shopifyOrderId,
+        sourceEventId: params.sourceEventId,
         note: params.note,
       })
       .returning({ id: walletTransactions.id });
     return { inserted: true, id: row.id, amountPaise: -amountToReverse };
   } catch (error) {
     if (isUniqueViolation(error)) {
-      return { inserted: false, reason: "conflict" };
+      return { inserted: false, reason: "duplicate" };
     }
     throw error;
   }
 }
 
-/** Reverses the full remaining credit for an order — used for orders/cancelled. */
+/**
+ * Reverses the full remaining credit for an order — used for
+ * orders/cancelled. An order can only be cancelled once, so the
+ * cancellation event's identity is just the order id with a fixed prefix
+ * (distinct from the order's own 'earned' sourceEventId, and distinct from
+ * any refund GID).
+ */
 export function reverseFullOrderCredit(params: { email: string; shopifyOrderId: string; note: string }) {
-  return insertReversalForOrder({ ...params, requestedAmountPaise: Number.MAX_SAFE_INTEGER });
+  return insertReversalForOrder({
+    ...params,
+    sourceEventId: `cancel:${params.shopifyOrderId}`,
+    requestedAmountPaise: Number.MAX_SAFE_INTEGER,
+  });
 }

@@ -35,6 +35,10 @@ function toOrderGid(numericId: number | string): string {
   return `gid://shopify/Order/${numericId}`;
 }
 
+function toRefundGid(numericId: number | string): string {
+  return `gid://shopify/Refund/${numericId}`;
+}
+
 function extractOrderEmail(order: ShopifyOrderPayload): string | null {
   const raw = order.email || order.contact_email || order.customer?.email || null;
   return raw ? normalizeEmail(raw) : null;
@@ -102,16 +106,10 @@ async function handleOrderCancelled(order: ShopifyOrderPayload) {
       // Already fully reversed by an earlier event for this order.
       return NextResponse.json({ ok: true, skipped: "already-reversed" });
     }
-    // reason === "conflict": a 'reversed' row already exists for this order
-    // (e.g. an earlier partial refund already used the one reversal slot
-    // the current schema allows) and we cannot safely tell whether this is
-    // a harmless retry of that same event or a new one. Fail loudly rather
-    // than guess — see lib/wallet/ledger.ts for the full explanation.
-    console.error(
-      `[wallet webhook] orders/cancelled for ${shopifyOrderId}: a reversal already exists for this order and ` +
-        `the current schema cannot record a second one. Needs manual review — see lib/wallet/ledger.ts.`
-    );
-    return NextResponse.json({ ok: false, error: "reversal-conflict" }, { status: 500 });
+    // reason === "duplicate": a retried delivery of this exact cancellation
+    // event — already processed correctly, not an error.
+    console.info(`[wallet webhook] duplicate orders/cancelled for ${shopifyOrderId} — already reversed, no-op.`);
+    return NextResponse.json({ ok: true, duplicate: true });
   }
 
   return NextResponse.json({ ok: true, reversed: result.amountPaise });
@@ -138,9 +136,12 @@ async function handleRefundCreate(refund: ShopifyRefundPayload) {
     return NextResponse.json({ ok: true, skipped: "zero-reversal" });
   }
 
+  const sourceEventId = toRefundGid(refund.id);
+
   const result = await insertReversalForOrder({
     email: earned.email,
     shopifyOrderId,
+    sourceEventId,
     requestedAmountPaise: reversalAmountPaise,
     note: `reversed: refund on order ${shopifyOrderId} (refunded subtotal ${(refundedSubtotalPaise / 100).toFixed(2)})`,
   });
@@ -149,12 +150,12 @@ async function handleRefundCreate(refund: ShopifyRefundPayload) {
     if (result.reason === "nothing-to-reverse") {
       return NextResponse.json({ ok: true, skipped: "already-reversed" });
     }
-    console.error(
-      `[wallet webhook] refunds/create for order ${shopifyOrderId} (refund ${refund.id}): a reversal already ` +
-        `exists for this order and the current schema cannot record a second one (e.g. a second partial refund). ` +
-        `Needs manual review — see lib/wallet/ledger.ts.`
-    );
-    return NextResponse.json({ ok: false, error: "reversal-conflict" }, { status: 500 });
+    // reason === "duplicate": a retried delivery of this exact refund event
+    // (same refund id) — already processed correctly, not an error. A
+    // second, DIFFERENT partial refund on the same order has its own
+    // sourceEventId and does not hit this path.
+    console.info(`[wallet webhook] duplicate refunds/create ${sourceEventId} for order ${shopifyOrderId} — already reversed, no-op.`);
+    return NextResponse.json({ ok: true, duplicate: true });
   }
 
   return NextResponse.json({ ok: true, reversed: result.amountPaise });
