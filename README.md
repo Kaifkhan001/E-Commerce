@@ -84,12 +84,9 @@ Auth is powered by NextAuth v5 (`lib/auth/auth.ts`). Each provider is registered
 ### Email provider setup
 Email (magic link) sign-in needs **two** things, not one:
 1. SMTP credentials (`EMAIL_SERVER_HOST/PORT/USER/PASSWORD`, `EMAIL_FROM`) — any transactional email provider (Resend, Postmark, SES, etc.) that exposes SMTP works.
-2. A **database adapter** — NextAuth stores email verification tokens in a database; it cannot do this as pure JWT. This is an infrastructure decision (which database, which adapter package) this build deliberately leaves to you rather than picking silently. Once you've chosen a database:
-   - `npm install @auth/DATABASE-adapter` (e.g. `@auth/prisma-adapter`, `@auth/drizzle-adapter`)
-   - Wire it into `lib/auth/auth.ts` as the `adapter` option
-   - Set `AUTH_DATABASE_URL`
+2. A **database adapter** — NextAuth stores email verification tokens in a database; it cannot do this as pure JWT. This is already wired up (the Drizzle adapter in `lib/auth/auth.ts`, backed by `DATABASE_URL`).
 
-   Until `AUTH_DATABASE_URL` is set, the Email option is hidden on the login page rather than appearing and silently failing.
+   Until all five SMTP vars above and `DATABASE_URL` are set, the Email option is hidden on the login page rather than appearing and silently failing.
 
 `NEXTAUTH_SECRET` is required for any provider to work: generate with `npx auth secret`.
 

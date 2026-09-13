@@ -2,6 +2,9 @@ import NextAuth from "next-auth";
 import Google from "next-auth/providers/google";
 import Facebook from "next-auth/providers/facebook";
 import Nodemailer from "next-auth/providers/nodemailer";
+import { DrizzleAdapter } from "@auth/drizzle-adapter";
+import { db } from "@/lib/db";
+import { accounts, sessions, users, verificationTokens } from "@/lib/db/schema";
 
 // Providers are only registered when their required env vars are present.
 // This means the app runs (and other auth methods still work) even before
@@ -30,19 +33,18 @@ if (process.env.FACEBOOK_CLIENT_ID && process.env.FACEBOOK_CLIENT_SECRET) {
 
 // Email (magic link) provider requires both SMTP config AND a database
 // adapter (NextAuth stores email verification tokens in a database — it
-// cannot run this flow purely as JWT). Choosing a database (Postgres,
-// MySQL, etc.) and adapter package is an infrastructure decision this
-// build does not make for you — see README "Email provider setup" for how
-// to wire one up. Until AUTH_DATABASE_URL is set, Email sign-in is not
-// registered, so it will not appear as an option (rather than appearing
-// and failing at runtime).
+// cannot run this flow purely as JWT). The Drizzle adapter above already
+// provides that (backed by DATABASE_URL), so this just checks the SMTP
+// side. Until all of these are set, Email sign-in is not registered, so
+// it will not appear as an option (rather than appearing and failing at
+// runtime).
 if (
   process.env.EMAIL_SERVER_HOST &&
   process.env.EMAIL_SERVER_PORT &&
   process.env.EMAIL_SERVER_USER &&
   process.env.EMAIL_SERVER_PASSWORD &&
   process.env.EMAIL_FROM &&
-  process.env.AUTH_DATABASE_URL
+  process.env.DATABASE_URL
 ) {
   providers.push(
     Nodemailer({
@@ -60,14 +62,24 @@ if (
 }
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
+  adapter: DrizzleAdapter(db, {
+    usersTable: users,
+    accountsTable: accounts,
+    sessionsTable: sessions,
+    verificationTokensTable: verificationTokens,
+  }),
   providers,
   pages: {
     signIn: "/auth/login",
   },
   session: {
-    // JWT sessions work for Google/Facebook out of the box. If Email
-    // sign-in is enabled via a database adapter, that adapter also handles
-    // its own session storage for users who sign in that way.
+    // Sessions stay JWT-backed (not database sessions) even with an
+    // adapter present — the adapter is used for persisting users/accounts
+    // (so OAuth sign-ins get a stable database user id, and future
+    // features like a server-synced wishlist have a real userId to key
+    // off), while session tokens themselves remain stateless. This is a
+    // supported, common combination and preserves the existing JWT
+    // behavior for Google/Facebook exactly.
     strategy: "jwt",
   },
 });
