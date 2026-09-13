@@ -90,6 +90,24 @@ Email (magic link) sign-in needs **two** things, not one:
 
 `NEXTAUTH_SECRET` is required for any provider to work: generate with `npx auth secret`.
 
+## Wallet cashback webhooks
+
+Customers earn 5% cashback (on product subtotal only, never shipping/tax) into a wallet balance shown on `/account`, funded by Shopify order webhooks hitting `app/api/webhooks/shopify`. Redemption/spending isn't built yet — this only earns and reverses credit.
+
+**In Shopify Admin**, go to **Settings > Notifications > Webhooks > Create webhook**, and create three separate webhooks, all pointing at your **production URL** (this app is deployed on Vercel, so use `https://<your-vercel-domain>/api/webhooks/shopify` — not `localhost`, which Shopify can't reach):
+
+| Event | Format |
+| --- | --- |
+| Order payment | JSON |
+| Order cancellation | JSON |
+| Refund creation | JSON |
+
+(These correspond to the `orders/paid`, `orders/cancelled`, and `refunds/create` topics — Shopify Admin lists them by plain-English event names in the dropdown, not the raw topic strings.)
+
+After creating the first webhook, Shopify shows a **signing secret** on that webhook's detail page (also visible under **Settings > Notifications > Webhooks**, scroll to the bottom for the shared secret used to sign all webhooks on this store). Set that value as `SHOPIFY_WEBHOOK_SECRET` in your environment (Vercel project settings, not `.env.local`, for production). All webhooks on a store share the same signing secret, so one value covers all three.
+
+The receiver verifies Shopify's `X-Shopify-Hmac-Sha256` signature against the raw request body before processing anything — an unverified request is rejected with 401 and nothing is written to the ledger.
+
 ## Razorpay configuration
 
 **This codebase does not implement a custom Razorpay checkout, and `RAZORPAY_KEY_ID`/`RAZORPAY_KEY_SECRET` are not read anywhere in the code.** This is deliberate, not an oversight.

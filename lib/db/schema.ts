@@ -1,4 +1,4 @@
-import { integer, pgTable, primaryKey, text, timestamp } from "drizzle-orm/pg-core";
+import { index, integer, pgEnum, pgTable, primaryKey, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 import type { AdapterAccountType } from "next-auth/adapters";
 
 // Auth.js (NextAuth) Drizzle adapter schema — table/column names and types
@@ -77,3 +77,58 @@ export const wishlistItems = pgTable("wishlist_items", {
   shopifyProductId: text("shopifyProductId").notNull(),
   createdAt: timestamp("createdAt", { mode: "date" }).notNull().defaultNow(),
 });
+
+// --------------------------------------------------------------------------
+// Wallet cashback ledger (APPEND-ONLY — see lib/wallet/balance.ts).
+//
+// There is deliberately no mutable "balance" column anywhere in this schema.
+// A user's balance is always the sum of their rows here, computed on read.
+// This makes every rupee traceable to a specific order/refund event, and
+// lets mistakes be fixed with a compensating row instead of silently
+// editing a number with no history.
+//
+// Wallets are keyed by NORMALIZED EMAIL (lowercased, trimmed), not by
+// NextAuth user id — see lib/wallet/money.ts `normalizeEmail`. Customers
+// check out on Shopify's hosted checkout as guests, so the order email is
+// the only reliable link back to them; a logged-in user's balance is looked
+// up by their account email, not a foreign key to `users`.
+export const walletTransactionTypeEnum = pgEnum("wallet_transaction_type", [
+  "earned",
+  "redeemed",
+  "expired",
+  "reversed",
+]);
+
+export const walletTransactions = pgTable(
+  "wallet_transactions",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    email: text("email").notNull(),
+    // Smallest currency unit (paise). Positive = credit, negative = debit.
+    // Never store money as a float anywhere in this feature.
+    amountPaise: integer("amountPaise").notNull(),
+    type: walletTransactionTypeEnum("type").notNull(),
+    // Shopify order GID/numeric id this row relates to. Nullable so a
+    // future manual adjustment (support crediting/debiting outside an
+    // order context) has somewhere to live without a fake order id —
+    // Postgres treats each NULL as distinct, so nulls never collide with
+    // the unique constraint below.
+    shopifyOrderId: text("shopifyOrderId"),
+    // Set for 'earned' rows only — when that credit stops being spendable.
+    expiresAt: timestamp("expiresAt", { mode: "date" }),
+    createdAt: timestamp("createdAt", { mode: "date" }).notNull().defaultNow(),
+    // Human-readable explanation for auditing (e.g. "5% cashback on order
+    // #1234" or "reversed: order #1234 cancelled").
+    note: text("note"),
+  },
+  (table) => ({
+    emailIdx: index("wallet_transactions_email_idx").on(table.email),
+    // Primary idempotency guard: a webhook retry or duplicate delivery for
+    // the same order can never insert a second row of the same type. See
+    // lib/wallet/ledger.ts for how this is used (and its current
+    // limitation for multiple partial refunds on one order).
+    orderTypeUnique: uniqueIndex("wallet_transactions_order_type_unique").on(table.shopifyOrderId, table.type),
+  })
+);
