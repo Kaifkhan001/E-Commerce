@@ -18,6 +18,12 @@ export type ComputeTrackingStatusInput = {
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
+// Elapsed days after which an unfulfilled order is assumed "shipped" rather
+// than just "placed". Exported so display code (e.g. the per-stage date
+// shown in the UI) can derive a "shipped by" date consistent with this same
+// threshold instead of hard-coding its own copy of it.
+export const SHIPPED_AFTER_DAYS = 1;
+
 // Pure function: no I/O, no clock reads unless `now` is omitted. Fulfillment
 // status from Shopify is the only source of truth for "delivered" — the
 // three earlier stages are always estimates derived from elapsed time.
@@ -38,7 +44,7 @@ export function computeTrackingStatus({
   let stage: TrackingStage;
   if (elapsedDays >= estimate.maxDays) {
     stage = "out_for_delivery";
-  } else if (elapsedDays >= 1) {
+  } else if (elapsedDays >= SHIPPED_AFTER_DAYS) {
     stage = "shipped";
   } else {
     stage = "placed";
