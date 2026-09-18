@@ -133,8 +133,25 @@ export async function shopifyAdminFetch<TData>(query: string, variables?: object
 
   const json = await response.json();
 
-  if (json.errors && (Array.isArray(json.errors) ? json.errors.length > 0 : true)) {
-    throw new ShopifyAdminApiError("Shopify Admin API returned GraphQL errors", response.status, json.errors);
+  const hasErrors = Boolean(json.errors) && (Array.isArray(json.errors) ? json.errors.length > 0 : true);
+  const hasData = json.data !== null && json.data !== undefined;
+
+  if (hasErrors && !hasData) {
+    // Fatal: the request produced no usable data at all (e.g. a syntax
+    // error, or a scope/access error on a field central enough to block the
+    // whole response). Nothing for the caller to work with — throw.
+    throw new ShopifyAdminApiError("Shopify Admin API returned GraphQL errors with no data", response.status, json.errors);
+  }
+
+  if (hasErrors) {
+    // Partial success: GraphQL allows `data` to come back alongside
+    // field-level errors — e.g. an access-scope error on one requested
+    // field still returns every other field, with just that field's value
+    // set to null. Discarding the whole response in that case would throw
+    // away real, usable data over one field the caller may not even need.
+    // Log it so a genuine, needed field silently going null is still
+    // visible, but let the caller decide whether what came back is enough.
+    console.warn("Shopify Admin API returned partial data alongside GraphQL errors:", JSON.stringify(json.errors));
   }
 
   return json.data as TData;
