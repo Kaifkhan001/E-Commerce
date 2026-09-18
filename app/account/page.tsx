@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth/auth";
 import { SignOutButton } from "@/components/auth/sign-out-button";
 import { WalletSection } from "@/components/account/wallet-section";
+import { OrderHistory } from "@/components/account/order-history";
 
 export const metadata: Metadata = { title: "Account" };
 
@@ -27,13 +28,16 @@ export default async function AccountPage() {
         </div>
       )}
 
-      <div className="mb-8 border border-border p-5">
-        <h2 className="mb-2 font-medium">Orders</h2>
-        <p className="text-sm text-charcoal-soft">
-          Order history requires connecting Shopify Customer Accounts — this section is a placeholder until that
-          integration is wired up (see README &ldquo;Shopify Customer Data&rdquo;).
-        </p>
-      </div>
+      {session.user?.email ? (
+        <OrderHistory email={session.user.email} />
+      ) : (
+        <div className="mb-8 border border-border p-5">
+          <h2 className="mb-2 font-medium">Orders</h2>
+          <p className="text-sm text-charcoal-soft">
+            We don&rsquo;t have an email on file for this account, so we can&rsquo;t look up your orders.
+          </p>
+        </div>
+      )}
 
       <SignOutButton />
     </div>
