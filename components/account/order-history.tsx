@@ -23,8 +23,7 @@ export async function OrderHistory({ email }: { email: string }) {
 
   if (!result.ok) {
     return (
-      <div className="mb-8 border border-border p-5">
-        <h2 className="mb-2 font-medium">Orders</h2>
+      <div className="border border-border p-5">
         <p className="text-sm text-charcoal-soft">
           {result.reason === "not_configured"
             ? "Order history isn't available right now."
@@ -36,8 +35,7 @@ export async function OrderHistory({ email }: { email: string }) {
 
   if (result.orders.length === 0) {
     return (
-      <div className="mb-8 border border-border p-5">
-        <h2 className="mb-2 font-medium">Orders</h2>
+      <div className="border border-border p-5">
         <p className="mb-4 text-sm text-charcoal-soft">You haven&rsquo;t placed any orders yet.</p>
         <LinkButton href="/shop" size="sm">
           Shop Bags
@@ -47,9 +45,8 @@ export async function OrderHistory({ email }: { email: string }) {
   }
 
   return (
-    <div className="mb-8 border border-border p-5">
-      <h2 className="mb-4 font-medium">Orders</h2>
-      <ul className="divide-y divide-border">
+    <div>
+      <ul className="divide-y divide-border border-y border-border">
         {result.orders.map((order) => (
           <OrderRow key={order.name} order={order} />
         ))}

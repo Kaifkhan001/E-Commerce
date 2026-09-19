@@ -22,8 +22,8 @@ export default async function AccountOrderPage({ params }: { params: Promise<{ o
 
   return (
     <div className="container-brand py-10 md:py-14">
-      <Link href="/account" className="mb-6 inline-block text-sm text-charcoal-soft hover:text-charcoal">
-        ← Back to Account
+      <Link href="/account/orders" className="mb-6 inline-block text-sm text-charcoal-soft hover:text-charcoal">
+        ← Back to Orders
       </Link>
 
       {!email ? (
