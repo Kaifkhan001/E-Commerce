@@ -4,6 +4,10 @@ import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth/auth";
 import { lookupOrderStatus } from "@/lib/order-tracking/lookup-order";
 import { OrderTrackingResult } from "@/components/order-tracking/order-tracking-result";
+import { fetchOrderForCancellation } from "@/lib/order-cancellation/fetch-order";
+import { checkCancellationEligibility } from "@/lib/order-cancellation/eligibility";
+import { getExistingCancellationRequest } from "@/lib/order-cancellation/requests";
+import { OrderCancellation, type OrderCancellationState } from "@/components/account/order-cancellation";
 
 export const metadata: Metadata = { title: "Order" };
 
@@ -63,6 +67,35 @@ async function OrderLookup({ orderNumber, email }: { orderNumber: string; email:
         Placed, Shipped, and Out for Delivery are estimated based on typical delivery timelines for your area —
         not live courier tracking. Delivered is confirmed manually by our team once your order actually arrives.
       </p>
+
+      <div className="mt-8">
+        <CancellationPanel orderNumber={orderNumber} email={email} />
+      </div>
     </>
   );
+}
+
+// Its own fetch (separate from lookupOrderStatus above) since cancellation
+// needs fields — cancelledAt, transactions, fulfillment status re-verified
+// fresh — that the read-only tracking view has no reason to ask for. See
+// lib/order-cancellation/fetch-order.ts.
+async function CancellationPanel({ orderNumber, email }: { orderNumber: string; email: string }) {
+  const result = await fetchOrderForCancellation(orderNumber, email);
+  if (!result.found) {
+    // Fails closed: if this can't be confirmed for any reason, simply don't
+    // offer cancellation rather than guessing at eligibility.
+    return null;
+  }
+
+  const { order } = result;
+  const eligibility = checkCancellationEligibility(order);
+  const existingRequest = eligibility.action === "request" ? await getExistingCancellationRequest(order.id) : null;
+
+  const state: OrderCancellationState = {
+    eligibility: eligibility.action === "blocked" ? "already_cancelled" : eligibility.action,
+    cancelledAt: order.cancelledAt,
+    existingRequestAt: existingRequest?.createdAt.toISOString() ?? null,
+  };
+
+  return <OrderCancellation orderNumber={orderNumber} state={state} />;
 }

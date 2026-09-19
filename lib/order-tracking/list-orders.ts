@@ -18,6 +18,7 @@ const ORDERS_BY_EMAIL_QUERY = `
         name
         createdAt
         email
+        cancelledAt
         displayFinancialStatus
         displayFulfillmentStatus
         shippingLine {
@@ -51,6 +52,7 @@ type OrdersByEmailResponse = {
       name: string;
       createdAt: string;
       email: string | null;
+      cancelledAt: string | null;
       displayFinancialStatus: string | null;
       displayFulfillmentStatus: string;
       shippingLine: { title: string } | null;
@@ -67,6 +69,7 @@ export type OrderSummary = {
   date: string;
   financialStatus: string | null;
   fulfillmentStatus: string;
+  cancellable: boolean;
   items: { title: string; quantity: number; imageUrl: string | null; imageAlt: string | null }[];
   total: { amount: string; currencyCode: string };
   tracking: TrackingStatus;
@@ -115,6 +118,12 @@ export async function listOrdersForEmail(email: string): Promise<OrderHistoryRes
           date: order.createdAt,
           financialStatus: order.displayFinancialStatus,
           fulfillmentStatus: order.displayFulfillmentStatus,
+          // Cheap, coarse hint for the list view only — the order detail
+          // page re-derives real eligibility from a fresh fetch (see
+          // lib/order-cancellation/eligibility.ts) before allowing any
+          // action, so this never needs to be more precise than "worth
+          // clicking into."
+          cancellable: order.displayFulfillmentStatus === "UNFULFILLED" && !order.cancelledAt,
           items: order.lineItems.nodes.map((item) => ({
             title: item.title,
             quantity: item.quantity,

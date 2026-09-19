@@ -72,6 +72,9 @@ function OrderRow({ order }: { order: OrderSummary }) {
           <div className="flex gap-2 text-xs">
             <span className="border border-border px-2 py-0.5 text-charcoal-soft">{statusLabel(order.financialStatus)}</span>
             <span className="border border-border px-2 py-0.5 text-charcoal-soft">{statusLabel(order.fulfillmentStatus)}</span>
+            {order.cancellable ? (
+              <span className="border border-border px-2 py-0.5 text-charcoal-soft">Eligible for cancellation</span>
+            ) : null}
           </div>
         </div>
         <div className="flex items-center gap-4">

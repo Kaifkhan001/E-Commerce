@@ -149,3 +149,33 @@ export const walletTransactions = pgTable(
     ),
   })
 );
+
+// --------------------------------------------------------------------------
+// Customer self-service order cancellation.
+//
+// Shopify itself has no notion of a "cancellation requested but not yet
+// acted on" state — an order is either cancelled or it isn't. For a
+// fulfilled/partially-fulfilled order we deliberately never auto-cancel (see
+// app/api/account/orders/[orderNumber]/request-cancellation/route.ts), so
+// the fact that a customer asked only exists if we record it ourselves.
+// This table exists purely so (a) the order detail page can show "you asked
+// on <date>" instead of the request button again after a reload, and (b) a
+// unique constraint on the order stops repeated clicks/reloads from sending
+// the store owner a duplicate email for the same order.
+export const cancellationRequests = pgTable(
+  "cancellation_requests",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    email: text("email").notNull(),
+    shopifyOrderId: text("shopifyOrderId").notNull(),
+    orderName: text("orderName").notNull(),
+    reason: text("reason").notNull(),
+    createdAt: timestamp("createdAt", { mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => ({
+    emailIdx: index("cancellation_requests_email_idx").on(table.email),
+    orderUnique: uniqueIndex("cancellation_requests_order_unique").on(table.shopifyOrderId),
+  })
+);
