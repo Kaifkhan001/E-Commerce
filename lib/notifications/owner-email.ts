@@ -1,40 +1,11 @@
 import "server-only";
-import nodemailer from "nodemailer";
+import { sendPlainTextEmail, type SendResult } from "./mailer";
 
 // Sends store-owner notifications for order cancellations and cancellation
-// requests, reusing the SAME SMTP credentials already configured for
-// magic-link sign-in (EMAIL_SERVER_*, EMAIL_FROM) rather than a separate
-// email setup — this app already has exactly one transactional email
-// provider (Resend, over SMTP). This is a plain nodemailer send, not
-// NextAuth's Nodemailer provider, since that provider is wired specifically
-// for magic-link verification emails and has no general "send an email"
-// entry point.
-
-function smtpConfigured(): boolean {
-  return Boolean(
-    process.env.EMAIL_SERVER_HOST &&
-      process.env.EMAIL_SERVER_PORT &&
-      process.env.EMAIL_SERVER_USER &&
-      process.env.EMAIL_SERVER_PASSWORD &&
-      process.env.EMAIL_FROM
-  );
-}
-
-let cachedTransporter: ReturnType<typeof nodemailer.createTransport> | null = null;
-
-function getTransporter() {
-  if (!cachedTransporter) {
-    cachedTransporter = nodemailer.createTransport({
-      host: process.env.EMAIL_SERVER_HOST,
-      port: Number(process.env.EMAIL_SERVER_PORT),
-      auth: {
-        user: process.env.EMAIL_SERVER_USER,
-        pass: process.env.EMAIL_SERVER_PASSWORD,
-      },
-    });
-  }
-  return cachedTransporter;
-}
+// requests. Best-effort throughout: a failed owner notification should
+// never block the underlying action or be reported to the customer as
+// their own action having failed — callers should log the return value,
+// not throw it upstream.
 
 export type OwnerNotificationParams = {
   kind: "cancelled" | "cancellation_requested";
@@ -45,22 +16,10 @@ export type OwnerNotificationParams = {
   timestamp: Date;
 };
 
-/**
- * Best-effort: a failed owner notification should never block the
- * cancellation itself (the customer's order is already cancelled in
- * Shopify by the time this is called) or be reported to the customer as
- * their action having failed. Callers should log the return value, not
- * throw it upstream.
- */
-export async function sendOwnerCancellationNotification(
-  params: OwnerNotificationParams
-): Promise<{ sent: true } | { sent: false; reason: string }> {
+export async function sendOwnerCancellationNotification(params: OwnerNotificationParams): Promise<SendResult> {
   const recipient = process.env.OWNER_NOTIFICATION_EMAIL;
   if (!recipient) {
     return { sent: false, reason: "OWNER_NOTIFICATION_EMAIL is not set" };
-  }
-  if (!smtpConfigured()) {
-    return { sent: false, reason: "SMTP is not configured" };
   }
 
   const subject =
@@ -83,15 +42,49 @@ export async function sendOwnerCancellationNotification(
     `Timestamp: ${params.timestamp.toISOString()}`,
   ].join("\n");
 
-  try {
-    await getTransporter().sendMail({
-      to: recipient,
-      from: process.env.EMAIL_FROM,
-      subject,
-      text,
-    });
-    return { sent: true };
-  } catch (err) {
-    return { sent: false, reason: err instanceof Error ? err.message : String(err) };
+  return sendPlainTextEmail({ to: recipient, subject, text });
+}
+
+export type RefundFailureAlertParams = {
+  orderName: string;
+  customerEmail: string;
+  amountDisplay: string;
+  /** What actually happened — e.g. "Shopify's refund transaction failed: <error>" or "Refund did not resolve within the polling window." */
+  detail: string;
+  /** True if the order was left uncancelled/untouched; false if cancellation had already gone through when this was detected (see execute-cancellation.ts "cancel_failed_after_refund"). */
+  orderUntouched: boolean;
+  timestamp: Date;
+};
+
+/**
+ * A DISTINCT, loudly-marked alert — deliberately not the same email as
+ * sendOwnerCancellationNotification's "cancelled" notice, and sent instead
+ * of it whenever a refund can't be confirmed. Without this, a failed
+ * refund is invisible until the customer complains — see the
+ * order_refund_issues table this pairs with for the durable record.
+ */
+export async function sendOwnerRefundFailureAlert(params: RefundFailureAlertParams): Promise<SendResult> {
+  const recipient = process.env.OWNER_NOTIFICATION_EMAIL;
+  if (!recipient) {
+    return { sent: false, reason: "OWNER_NOTIFICATION_EMAIL is not set" };
   }
+
+  const subject = `ACTION NEEDED: refund failed for order ${params.orderName} — manual refund required`;
+
+  const text = [
+    "A customer's self-service cancellation could not be completed because their refund failed.",
+    params.orderUntouched
+      ? "The order was NOT cancelled — it is unchanged in Shopify, still paid and unfulfilled."
+      : "IMPORTANT: the order WAS already cancelled in Shopify before this was detected. The customer has not been refunded.",
+    "",
+    `Order: ${params.orderName}`,
+    `Customer email: ${params.customerEmail}`,
+    `Amount owed: ${params.amountDisplay}`,
+    `What happened: ${params.detail}`,
+    `Timestamp: ${params.timestamp.toISOString()}`,
+    "",
+    "Please refund this customer manually (Shopify Admin or directly in Razorpay) and follow up with them.",
+  ].join("\n");
+
+  return sendPlainTextEmail({ to: recipient, subject, text });
 }

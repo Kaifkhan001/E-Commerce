@@ -179,3 +179,50 @@ export const cancellationRequests = pgTable(
     orderUnique: uniqueIndex("cancellation_requests_order_unique").on(table.shopifyOrderId),
   })
 );
+
+// --------------------------------------------------------------------------
+// Unresolved refund problems from self-service cancellation.
+//
+// Shopify's orderCancel/refundCreate refund attempts resolve ASYNCHRONOUSLY
+// and can fail (or hang indefinitely) after the mutation itself already
+// reported success — confirmed against a real failure in production (order
+// #1006: cancelled, restocked, but its refund transaction resolved to
+// FAILURE ~2 seconds after the job reported done, with zero indication in
+// the mutation's own response). A failure like this has NO webhook and
+// leaves no other queryable trace, so this table is the only durable record
+// that a customer's money is unresolved and needs a human to look at it —
+// see lib/order-cancellation/issues.ts and execute-cancellation.ts.
+//
+// `resolvedAt` is written by nobody in this codebase yet — there is no
+// admin UI for it. It exists so a human (via a direct database query, for
+// now) can mark an issue handled once they've refunded the customer
+// manually, without deleting the audit trail of what happened.
+export const orderRefundIssueReasonEnum = pgEnum("order_refund_issue_reason", [
+  "refund_failed",
+  "refund_timeout",
+  "cancel_failed_after_refund",
+  "ambiguous_payment_state",
+]);
+
+export const orderRefundIssues = pgTable(
+  "order_refund_issues",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    email: text("email").notNull(),
+    shopifyOrderId: text("shopifyOrderId").notNull(),
+    orderName: text("orderName").notNull(),
+    amountPaise: integer("amountPaise").notNull(),
+    currencyCode: text("currencyCode").notNull(),
+    reason: orderRefundIssueReasonEnum("reason").notNull(),
+    // Raw error message/code from Shopify, for whoever investigates.
+    detail: text("detail"),
+    createdAt: timestamp("createdAt", { mode: "date" }).notNull().defaultNow(),
+    resolvedAt: timestamp("resolvedAt", { mode: "date" }),
+  },
+  (table) => ({
+    orderIdx: index("order_refund_issues_order_idx").on(table.shopifyOrderId),
+    unresolvedIdx: index("order_refund_issues_unresolved_idx").on(table.resolvedAt),
+  })
+);

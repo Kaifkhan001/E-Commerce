@@ -1,18 +1,12 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth/auth";
-import { fetchOrderForCancellation } from "@/lib/order-cancellation/fetch-order";
-import { checkCancellationEligibility, determineRefundNeeded } from "@/lib/order-cancellation/eligibility";
-import { startOrderCancellation, pollJobUntilDone } from "@/lib/order-cancellation/cancel-order";
-import { isValidCancellationReason, cancellationReasonLabel } from "@/lib/order-cancellation/reasons";
-import { sendOwnerCancellationNotification } from "@/lib/notifications/owner-email";
-import { formatMoney } from "@/lib/utils/format";
+import { isValidCancellationReason } from "@/lib/order-cancellation/reasons";
+import { executeCancellation } from "@/lib/order-cancellation/execute-cancellation";
 
-// Executes an actual cancellation. Every safety check here is re-derived
-// from a FRESH Shopify read taken during this exact request — the email
-// match, the fulfillment status, and whether a refund is owed are never
-// trusted from whatever the page happened to render with, because any of
-// them can have changed between page load and this submit (see
-// eligibility.ts and fetch-order.ts).
+// Thin HTTP wrapper — all the actual decision-making (refund-first,
+// confirm, only-then-cancel, and every failure branch) lives in
+// lib/order-cancellation/execute-cancellation.ts. This route's only job is
+// auth + input validation + mapping an outcome to a status code.
 export async function POST(request: Request, { params }: { params: Promise<{ orderNumber: string }> }) {
   const session = await auth();
   const email = session?.user?.email;
@@ -33,76 +27,38 @@ export async function POST(request: Request, { params }: { params: Promise<{ ord
     return NextResponse.json({ ok: false, error: "invalid_reason" }, { status: 400 });
   }
 
-  const result = await fetchOrderForCancellation(orderNumber, email);
-  if (!result.found) {
-    // Same generic message whether the order doesn't exist or belongs to a
-    // different email — never confirm/deny which, to a caller who isn't
-    // its owner. This is the server-side re-check the UI's own filtering
-    // must never be trusted in place of.
-    return NextResponse.json({ ok: false, error: "order_not_found" }, { status: 404 });
+  const result = await executeCancellation({ orderNumber, email, reason });
+
+  switch (result.outcome) {
+    case "cancelled":
+      return NextResponse.json({ ok: true, cancelled: true, refunded: result.refunded });
+    case "not_found":
+      // Same generic error whether the order doesn't exist or belongs to a
+      // different email — never confirm/deny which, to a caller who isn't
+      // its owner.
+      return NextResponse.json({ ok: false, error: "order_not_found" }, { status: 404 });
+    case "already_cancelled":
+      return NextResponse.json({ ok: false, error: "already_cancelled" }, { status: 409 });
+    case "no_longer_auto_cancellable":
+      // The order stopped being auto-cancellable between page load and this
+      // submit (e.g. it just got fulfilled) — fail safely.
+      return NextResponse.json({ ok: false, error: "no_longer_auto_cancellable" }, { status: 409 });
+    case "ambiguous_payment_state":
+      return NextResponse.json({ ok: false, error: "ambiguous_payment_state" }, { status: 409 });
+    case "refund_failed":
+      return NextResponse.json({ ok: false, error: "refund_failed" }, { status: 502 });
+    case "refund_timeout":
+      return NextResponse.json({ ok: false, error: "refund_timeout" }, { status: 504 });
+    case "cancel_failed_after_refund":
+      // Money already moved; the order itself needs manual attention. This
+      // is NOT the customer's fault and NOT something a retry fixes safely
+      // (a retry is fine — see execute-cancellation.ts's re-refund guard —
+      // but won't necessarily resolve the underlying cancel failure), so
+      // it's surfaced distinctly rather than folded into a generic error.
+      return NextResponse.json({ ok: false, error: "cancel_failed_after_refund" }, { status: 500 });
+    case "cancel_mutation_failed":
+      return NextResponse.json({ ok: false, error: "cancellation_failed" }, { status: 502 });
+    case "not_confirmed":
+      return NextResponse.json({ ok: false, error: "not_confirmed" }, { status: 202 });
   }
-
-  const { order } = result;
-  const eligibility = checkCancellationEligibility(order);
-
-  if (eligibility.action === "blocked") {
-    return NextResponse.json({ ok: false, error: "already_cancelled" }, { status: 409 });
-  }
-  if (eligibility.action === "request") {
-    // The order stopped being auto-cancellable between page load and this
-    // submit (e.g. it just got fulfilled) — fail safely rather than
-    // cancelling a fulfilled order.
-    return NextResponse.json({ ok: false, error: "no_longer_auto_cancellable" }, { status: 409 });
-  }
-
-  const refund = determineRefundNeeded(order);
-
-  const started = await startOrderCancellation({
-    orderId: order.id,
-    refund,
-    staffNote: `Customer self-cancelled via website. Reason: ${cancellationReasonLabel(reason)}`.slice(0, 255),
-  });
-
-  if (!started.ok) {
-    console.error(`[order-cancellation] orderCancel failed for ${order.name}:`, started.error);
-    return NextResponse.json({ ok: false, error: "cancellation_failed" }, { status: 502 });
-  }
-
-  if (!started.alreadyDone) {
-    await pollJobUntilDone(started.jobId);
-  }
-
-  // Re-fetch, independent of whether polling confirmed "done" in time —
-  // this is the actual source of truth for what happened.
-  const after = await fetchOrderForCancellation(orderNumber, email);
-  if (!after.found || !after.order.cancelledAt) {
-    console.error(`[order-cancellation] order ${order.name} not confirmed cancelled after job completion.`);
-    return NextResponse.json({ ok: false, error: "not_confirmed" }, { status: 202 });
-  }
-
-  const refunded = refund && after.order.refundedPaise > 0;
-  if (refund && !refunded) {
-    console.warn(
-      `[order-cancellation] order ${order.name} was cancelled but refund not yet reflected in totalRefundedSet.`
-    );
-  }
-
-  const emailResult = await sendOwnerCancellationNotification({
-    kind: "cancelled",
-    orderName: order.name,
-    customerEmail: email,
-    reason: cancellationReasonLabel(reason),
-    totalDisplay: formatMoney({ amount: String(order.totalPaise / 100), currencyCode: order.currencyCode }),
-    timestamp: new Date(),
-  });
-  if (!emailResult.sent) {
-    console.warn(`[order-cancellation] owner notification email not sent for ${order.name}: ${emailResult.reason}`);
-  }
-
-  return NextResponse.json({
-    ok: true,
-    cancelled: true,
-    refundRequested: refund,
-    refundConfirmed: refunded,
-  });
 }

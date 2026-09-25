@@ -166,6 +166,13 @@ function errorMessageFor(code: string | undefined): string {
       return "We couldn't cancel your order right now. Please try again in a moment, or contact us for help.";
     case "not_confirmed":
       return "Your cancellation is being processed — refresh the page in a moment to see the update.";
+    case "refund_failed":
+    case "refund_timeout":
+      return "We couldn't process your refund automatically, so we haven't cancelled your order. We've been notified and will follow up with you by email shortly.";
+    case "ambiguous_payment_state":
+      return "This order needs manual review before it can be cancelled. We've been notified and will follow up with you by email shortly.";
+    case "cancel_failed_after_refund":
+      return "Your refund was issued, but we ran into a problem finalizing the cancellation. We've been notified and will follow up shortly.";
     default:
       return "Something went wrong. Please try again in a moment.";
   }
