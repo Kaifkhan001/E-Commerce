@@ -189,7 +189,7 @@ Delhivery is a valid alternative for the serviceability checker but isn't implem
 
 - **Real product photos not yet included** — waiting on the 7 real product images; interim Unsplash photography is in place everywhere (see "Product photography").
 - Newsletter and contact forms are UI-only (no email service wired up) — see `TODO` comments in `components/home/newsletter-form.tsx` and `app/contact/page.tsx`.
-- Wishlist is per-browser (localStorage), not synced across devices for signed-in users — see comments in `features/wishlist/wishlist-context.tsx`.
+- Wishlist is database-backed and synced across devices for signed-in users (`wishlist_items` table); anonymous visitors still get a per-browser (localStorage) wishlist, merged into their account automatically on their next sign-in. See `features/wishlist/wishlist-context.tsx` and `lib/wishlist/db.ts`.
 - Order history on `/account` is a placeholder pending Shopify Customer Account API integration.
 - Delhivery is documented as a delivery-checker alternative but not implemented — see "Delivery partner setup".
 - `nodemailer` is pinned to the exact version `9.0.5` (via both a direct dependency and a matching `overrides` entry in `package.json`) to close a high-severity CVE affecting `<=9.0.0`, since that version sits slightly outside next-auth's declared peer range (`^7.0.7 || ^8.0.5`). The `overrides` entry is required for `npm install` to succeed cleanly from a fresh clone — verified with a from-scratch `rm -rf node_modules package-lock.json && npm install`. Re-check this pin on next-auth upgrades.

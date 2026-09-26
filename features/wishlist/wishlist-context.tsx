@@ -1,16 +1,14 @@
 "use client";
 
-// Client-side wishlist, persisted to localStorage so it survives reloads on
-// the same browser for both signed-in and anonymous visitors. This is NOT
-// synced to a server, so it will not follow a user across devices — that
-// requires a database-backed store keyed to the authenticated user (see
-// README "Wishlist" section for how to extend this once you have one).
-//
-// Implemented with useSyncExternalStore (rather than useState+useEffect) so
-// localStorage acts as a proper external store — this avoids the
-// "setState-in-effect" anti-pattern for what is genuinely external state.
+// Dual-mode wishlist: anonymous visitors are stored in localStorage exactly
+// as before (via useSyncExternalStore, so it behaves like a proper external
+// store); signed-in users are backed by the database (lib/wishlist/db.ts),
+// with optimistic updates here and a rollback on failure. Consumers
+// (WishlistButton, WishlistView) call the same useWishlist() API regardless
+// of which mode is active — this file is the only place that knows the
+// difference.
 
-import { createContext, useCallback, useContext, useSyncExternalStore } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 const STORAGE_KEY = "bag_store_wishlist";
 const CHANGE_EVENT = "bag_store_wishlist_change";
@@ -67,6 +65,19 @@ function getServerSnapshot(): string[] {
   return EMPTY_IDS;
 }
 
+async function postWishlistItem(method: "POST" | "DELETE", shopifyProductId: string): Promise<boolean> {
+  try {
+    const res = await fetch("/api/wishlist", {
+      method,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ shopifyProductId }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
 type WishlistContextValue = {
   ids: string[];
   toggle: (productId: string) => void;
@@ -75,15 +86,93 @@ type WishlistContextValue = {
 
 const WishlistContext = createContext<WishlistContextValue | null>(null);
 
-export function WishlistProvider({ children }: { children: React.ReactNode }) {
-  const ids = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+export function WishlistProvider({
+  children,
+  userId,
+  initialIds,
+}: {
+  children: React.ReactNode;
+  /** The signed-in user's database id, or null for an anonymous visitor — sourced server-side from auth(), see app/layout.tsx. */
+  userId: string | null;
+  /** Server-fetched wishlist for `userId`, so there's no loading flash on first paint — ignored when `userId` is null. */
+  initialIds: string[];
+}) {
+  const localIds = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+  const [accountIds, setAccountIds] = useState<string[]>(initialIds);
 
-  const toggle = useCallback((productId: string) => {
-    const current = readIds();
-    const next = current.includes(productId) ? current.filter((id) => id !== productId) : [...current, productId];
-    writeIds(next);
-  }, []);
+  // Merge-on-login: this can ONLY happen here, client-side, after a fresh
+  // sign-in — a NextAuth callback runs server-side while processing the
+  // OAuth/magic-link request and has no access to this browser's
+  // localStorage at all. `mergedRef` (rather than relying solely on the
+  // effect's dependency array) stops React Strict Mode's dev-only double
+  // invoke from sending the merge request twice on the same mount; the
+  // server's unique constraint would no-op a genuine duplicate anyway, but
+  // there's no reason to make the network call twice.
+  const mergedRef = useRef(false);
 
+  useEffect(() => {
+    if (!userId || mergedRef.current) return;
+    mergedRef.current = true;
+
+    const pending = readIds();
+    if (pending.length === 0) return;
+
+    let cancelled = false;
+    fetch("/api/wishlist/merge", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ shopifyProductIds: pending }),
+    })
+      .then((res) => (res.ok ? res.json() : Promise.reject(new Error("merge request failed"))))
+      .then((data: { ids: string[] }) => {
+        if (cancelled) return;
+        // Only clear the local copy once the merge is confirmed safe on
+        // the server — never before.
+        writeIds([]);
+        setAccountIds(data.ids);
+      })
+      .catch(() => {
+        // Leave localStorage untouched — the user must not lose items to a
+        // failed network call. mergedRef staying true means this mount
+        // won't retry; a later reload (fresh mount) will.
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
+
+  const toggle = useCallback(
+    (productId: string) => {
+      if (!userId) {
+        const current = readIds();
+        const next = current.includes(productId) ? current.filter((id) => id !== productId) : [...current, productId];
+        writeIds(next);
+        return;
+      }
+
+      const isRemoving = accountIds.includes(productId);
+      setAccountIds((current) =>
+        isRemoving ? current.filter((id) => id !== productId) : [...current, productId]
+      );
+
+      postWishlistItem(isRemoving ? "DELETE" : "POST", productId).then((ok) => {
+        if (ok) return;
+        // Roll back — the UI must never keep showing a state the server
+        // didn't actually confirm.
+        setAccountIds((current) =>
+          isRemoving
+            ? current.includes(productId)
+              ? current
+              : [...current, productId]
+            : current.filter((id) => id !== productId)
+        );
+      });
+    },
+    [userId, accountIds]
+  );
+
+  const ids = userId ? accountIds : localIds;
   const has = useCallback((productId: string) => ids.includes(productId), [ids]);
 
   return <WishlistContext.Provider value={{ ids, toggle, has }}>{children}</WishlistContext.Provider>;

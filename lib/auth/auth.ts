@@ -82,6 +82,20 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     // behavior for Google/Facebook exactly.
     strategy: "jwt",
   },
+  callbacks: {
+    // `token.sub` is set by Auth.js itself (to the adapter user's real
+    // database id) on initial sign-in, for every provider — verified
+    // against @auth/core's own callback source, not assumed. This just
+    // surfaces that same id on the session object so server code (the
+    // database-backed wishlist) has a stable id to key off instead of
+    // email — see lib/wishlist/db.ts.
+    session({ session, token }) {
+      if (session.user && token.sub) {
+        session.user.id = token.sub;
+      }
+      return session;
+    },
+  },
 });
 
 export const authProvidersConfigured = {

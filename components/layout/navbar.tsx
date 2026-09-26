@@ -78,7 +78,7 @@ export function Navbar() {
           <Link href="/account" aria-label="Account" className="hidden p-2 hover:opacity-60 sm:block">
             <User size={20} />
           </Link>
-          <Link href="/account/wishlist" aria-label="Wishlist" className="hidden p-2 hover:opacity-60 sm:block">
+          <Link href="/wishlist" aria-label="Wishlist" className="hidden p-2 hover:opacity-60 sm:block">
             <Heart size={20} />
           </Link>
           <button onClick={openDrawer} aria-label="Open cart" className="relative p-2 hover:opacity-60">
@@ -141,7 +141,7 @@ export function Navbar() {
                 >
                   <Link href="/search" onClick={() => setMobileOpen(false)}>Search</Link>
                   <Link href="/account" onClick={() => setMobileOpen(false)}>Account</Link>
-                  <Link href="/account/wishlist" onClick={() => setMobileOpen(false)}>Wishlist</Link>
+                  <Link href="/wishlist" onClick={() => setMobileOpen(false)}>Wishlist</Link>
                 </motion.div>
               </motion.nav>
             </motion.div>

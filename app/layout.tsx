@@ -6,6 +6,8 @@ import "./globals.css";
 import { getCart } from "@/lib/shopify/cart";
 import { CartProvider } from "@/components/cart/cart-context";
 import { WishlistProvider } from "@/features/wishlist/wishlist-context";
+import { auth } from "@/lib/auth/auth";
+import { getWishlistProductIds } from "@/lib/wishlist/db";
 import { AnalyticsScripts } from "@/lib/analytics/analytics-scripts";
 import { CartDrawer } from "@/components/cart/cart-drawer";
 import { AnnouncementBar } from "@/components/layout/announcement-bar";
@@ -34,7 +36,9 @@ export const metadata: Metadata = {
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  const cart = await getCart();
+  const [cart, session] = await Promise.all([getCart(), auth()]);
+  const userId = session?.user?.id ?? null;
+  const initialWishlistIds = userId ? await getWishlistProductIds(userId) : [];
 
   const organizationJsonLd = {
     "@context": "https://schema.org",
@@ -52,7 +56,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         />
         <AnalyticsScripts />
         <CartProvider initialCart={cart}>
-          <WishlistProvider>
+          <WishlistProvider userId={userId} initialIds={initialWishlistIds}>
             <AnnouncementBar />
             <Navbar />
             <main className="flex-1">{children}</main>

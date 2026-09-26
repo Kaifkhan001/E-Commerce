@@ -63,20 +63,31 @@ export const verificationTokens = pgTable(
   })
 );
 
-// Schema only for now — no UI or query logic wired against this yet.
-// Will back a server-synced wishlist (replacing/augmenting the current
-// localStorage-only implementation in features/wishlist/wishlist-context.tsx)
-// in a later step.
-export const wishlistItems = pgTable("wishlist_items", {
-  id: text("id")
-    .primaryKey()
-    .$defaultFn(() => crypto.randomUUID()),
-  userId: text("userId")
-    .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),
-  shopifyProductId: text("shopifyProductId").notNull(),
-  createdAt: timestamp("createdAt", { mode: "date" }).notNull().defaultNow(),
-});
+// Backs the authenticated-user wishlist — see lib/wishlist/db.ts. Anonymous
+// visitors still use localStorage only (features/wishlist/wishlist-context.tsx);
+// rows here only ever exist for a signed-in account.
+export const wishlistItems = pgTable(
+  "wishlist_items",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    userId: text("userId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    shopifyProductId: text("shopifyProductId").notNull(),
+    createdAt: timestamp("createdAt", { mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => ({
+    userIdx: index("wishlist_items_user_idx").on(table.userId),
+    // The real dedup guard for merging a local (anonymous) wishlist into an
+    // account on login — an insert for a product already saved collides
+    // with this instead of creating a duplicate row. See
+    // lib/wishlist/db.ts mergeWishlistItems, which relies on this via
+    // onConflictDoNothing rather than an application-level existence check.
+    userProductUnique: uniqueIndex("wishlist_items_user_product_unique").on(table.userId, table.shopifyProductId),
+  })
+);
 
 // --------------------------------------------------------------------------
 // Wallet cashback ledger (APPEND-ONLY — see lib/wallet/balance.ts).

@@ -1,0 +1,2 @@
+CREATE INDEX "wishlist_items_user_idx" ON "wishlist_items" USING btree ("userId");--> statement-breakpoint
+CREATE UNIQUE INDEX "wishlist_items_user_product_unique" ON "wishlist_items" USING btree ("userId","shopifyProductId");
